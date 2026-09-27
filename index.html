@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Liste de courses</title>
+<style>
+  :root {
+    --bg: #f5f5f0;
+    --card: #ffffff;
+    --text: #2b2b2b;
+    --muted: #8a8a8a;
+    --accent: #3a7d44;
+    --danger: #c0463b;
+    --border: #e2e2dc;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1c1c;
+      --card: #2a2a2a;
+      --text: #eeeeee;
+      --muted: #999999;
+      --accent: #5fb86b;
+      --danger: #e06a5f;
+      --border: #3a3a3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1c1c;
+    --card: #2a2a2a;
+    --text: #eeeeee;
+    --muted: #999999;
+    --accent: #5fb86b;
+    --danger: #e06a5f;
+    --border: #3a3a3a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  header {
+    padding-top: env(safe-area-inset-top, 0px);
+    text-align: center;
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 1rem;
+  }
+  input[type="text"]:focus {
+    outline: 2px solid var(--accent);
+  }
+  button {
+    border: none;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+  }
+  button:active {
+    opacity: 0.8;
+  }
+  ul#list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-x: auto;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+  }
+  li.checked span.label {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  li input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  li span.label {
+    flex: 1;
+    font-size: 1rem;
+    word-break: break-word;
+  }
+  li button.delete {
+    background: none;
+    color: var(--danger);
+    font-size: 1.2rem;
+    padding: 0 6px;
+    line-height: 1;
+  }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px 0;
+    font-size: 0.9rem;
+  }
+  .footer-actions {
+    display: flex;
+    justify-content: center;
+  }
+  .clear-btn {
+    background: none;
+    color: var(--danger);
+    font-size: 0.85rem;
+    font-weight: 400;
+    text-decoration: underline;
+    padding: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🛒 Liste de courses</h1>
+      <div class="subtitle" id="counter"></div>
+    </header>
+
+    <form id="addForm">
+      <input type="text" id="itemInput" placeholder="Ajouter un article..." autocomplete="off" autocapitalize="sentences">
+      <button type="submit">+</button>
+    </form>
+
+    <ul id="list"></ul>
+    <div class="empty" id="emptyMsg" style="display:none;">Ta liste est vide. Ajoute un article ci-dessus !</div>
+
+    <div class="footer-actions">
+      <button type="button" class="clear-btn" id="clearChecked">Effacer les articles cochés</button>
+    </div>
+  </div>
+
+<script>
+  const STORAGE_KEY = "liste-courses-items";
+  const listEl = document.getElementById("list");
+  const form = document.getElementById("addForm");
+  const input = document.getElementById("itemInput");
+  const emptyMsg = document.getElementById("emptyMsg");
+  const counter = document.getElementById("counter");
+  const clearCheckedBtn = document.getElementById("clearChecked");
+
+  let items = [];
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      items = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      items = [];
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {
+      console.error("Erreur de sauvegarde :", e);
+    }
+  }
+
+  function render() {
+    listEl.innerHTML = "";
+    if (items.length === 0) {
+      emptyMsg.style.display = "block";
+    } else {
+      emptyMsg.style.display = "none";
+    }
+
+    items.forEach((item, index) => {
+      const li = document.createElement("li");
+      if (item.checked) li.classList.add("checked");
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = item.checked;
+      checkbox.addEventListener("change", () => {
+        items[index].checked = checkbox.checked;
+        save();
+        render();
+      });
+
+      const span = document.createElement("span");
+      span.className = "label";
+      span.textContent = item.text;
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", () => {
+        items.splice(index, 1);
+        save();
+        render();
+      });
+
+      li.appendChild(checkbox);
+      li.appendChild(span);
+      li.appendChild(delBtn);
+      listEl.appendChild(li);
+    });
+
+    const remaining = items.filter(i => !i.checked).length;
+    counter.textContent = items.length
+      ? `${remaining} article${remaining !== 1 ? "s" : ""} restant${remaining !== 1 ? "s" : ""}`
+      : "";
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    items.push({ text, checked: false });
+    input.value = "";
+    save();
+    render();
+  });
+
+  clearCheckedBtn.addEventListener("click", () => {
+    items = items.filter(i => !i.checked);
+    save();
+    render();
+  });
+
+  load();
+  render();
+</script>
+</body>
+</html>
